@@ -8,4 +8,6 @@ process.stdout.on('error', (err) => {
   if (err.code !== 'EPIPE') throw err
 })
 
-process.exitCode = await run(process.argv.slice(2))
+const exitCode = await run(process.argv.slice(2))
+
+process.stdout.write('', () => process.exit(exitCode))

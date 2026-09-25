@@ -9,7 +9,7 @@ import { tmpdir } from 'os'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = dirname(__dirname)
 
-function runCli(args) {
+function runCli(args, { timeout = 10000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['bin/lunte', ...args], {
       cwd: projectRoot,
@@ -25,8 +25,13 @@ function runCli(args) {
       stderr += chunk
     })
 
+    const timer = setTimeout(() => child.kill(), timeout)
+
     child.on('error', reject)
-    child.on('close', (code) => resolve({ code, stdout, stderr }))
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolve({ code, stdout, stderr })
+    })
   })
 }
 
@@ -48,4 +53,23 @@ test('CLI writes the full report when stdout is a pipe', async (t) => {
   t.is(lines.length, count + 1, 'one line per diagnostic plus the summary')
   t.ok(lines[count - 1].includes(`'undefinedGlobal${count - 1}' is not defined.`))
   t.is(lines[count], `${count} errors`, 'summary line should be the last line')
+})
+
+test('CLI exits after writing the report even if a plugin keeps the event loop alive', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'lunte-cli-output-'))
+  const plugin = join(dir, 'plugin.mjs')
+  const file = join(dir, 'valid.js')
+  await writeFile(
+    plugin,
+    `setInterval(() => {}, 1000)
+export default { rules: [{ meta: { name: 'test/cli-output-noop' }, create: () => ({}) }] }
+`
+  )
+  await writeFile(file, 'export const answer = 42\n')
+
+  const result = await runCli(['--plugin', plugin, file], { timeout: 5000 })
+
+  t.is(result.code, 0, 'CLI should exit on its own with code 0')
+  t.ok(result.stdout.includes('No issues found'))
+  t.is(result.stderr, '')
 })

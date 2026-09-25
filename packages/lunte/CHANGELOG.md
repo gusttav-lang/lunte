@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Report TypeScript parameters with both a type annotation and a default value (`a: T = x`) at their real location, so their diagnostics no longer print `?:?` and can be suppressed with `lunte-disable-next-line`.
+
 ## 1.8.3
 
 ### Fixed

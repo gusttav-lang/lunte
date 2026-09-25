@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Accept `[severity, ...options]` rule entries in `.lunterc`, passed to rules as `context.options` with `meta.defaultOptions` as the fallback.
+- Accept `[severity, ...options]` rule entries in `.lunterc`, passed to rules as `context.options` with `meta.defaultOptions` as the fallback. Each file gets its own copy, so a rule cannot change them for later files or runs.
 
 ## 1.8.3
 

@@ -1,0 +1,51 @@
+import process from 'process'
+import test from 'brittle'
+import { spawn } from 'child_process'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+import { mkdtemp, writeFile } from 'fs/promises'
+import { tmpdir } from 'os'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const projectRoot = dirname(__dirname)
+
+function runCli(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['bin/lunte', ...args], {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk
+    })
+
+    child.on('error', reject)
+    child.on('close', (code) => resolve({ code, stdout, stderr }))
+  })
+}
+
+test('CLI writes the full report when stdout is a pipe', async (t) => {
+  const count = 5000
+  const dir = await mkdtemp(join(tmpdir(), 'lunte-cli-output-'))
+  const file = join(dir, 'many-errors.js')
+  let source = ''
+  for (let i = 0; i < count; i++) source += `undefinedGlobal${i}\n`
+  await writeFile(file, source)
+
+  const result = await runCli([file])
+
+  t.is(result.code, 1)
+  t.is(result.stderr, '')
+  t.ok(result.stdout.length > 256 * 1024, 'report should be well over the 64 KB pipe buffer')
+
+  const lines = result.stdout.trimEnd().split('\n')
+  t.is(lines.length, count + 1, 'one line per diagnostic plus the summary')
+  t.ok(lines[count - 1].includes(`'undefinedGlobal${count - 1}' is not defined.`))
+  t.is(lines[count], `${count} errors`, 'summary line should be the last line')
+})

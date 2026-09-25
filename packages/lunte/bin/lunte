@@ -4,6 +4,8 @@ import process from 'process'
 
 import { run } from '../src/cli.js'
 
-const exitCode = await run(process.argv.slice(2))
+process.stdout.on('error', (err) => {
+  if (err.code !== 'EPIPE') throw err
+})
 
-process.exit(exitCode)
+process.exitCode = await run(process.argv.slice(2))
